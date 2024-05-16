@@ -109,12 +109,15 @@ func (db DB[KT, VT]) Has(key KT) (bool, error) {
 	return db.DB.Has(kb)
 }
 
+// Fold iterates over all keys in the database calling the function `fn` for
+// each key. If the function returns an error, no further keys are processed
+// and the error returned.
 func (db DB[KT, VT]) Fold(fn func(key KT, val VT, err error) error) (err error) {
 	iter := db.DB.Items()
-	for !IsTerminate(err) {
+	for err == nil {
 		// Fetch the key-value pair from DB as []byte.
 		kb, vb, e := iter.Next()
-		if IsTerminate(e) {
+		if isTerminate(e) {
 			return nil
 		}
 		err = errors.Join(err, e)
@@ -133,6 +136,6 @@ func (db DB[KT, VT]) Fold(fn func(key KT, val VT, err error) error) (err error) 
 	return
 }
 
-func IsTerminate(err error) bool {
+func isTerminate(err error) bool {
 	return errors.Is(err, pogreb.ErrIterationDone) || errors.Is(err, io.EOF)
 }
