@@ -41,13 +41,13 @@ func main() {
   defer db.Close()
 
   // Easily store the string-User key value pair without dealing with the conversion to []byte.
-  err := katalis.Put("alice-id", User{Name: "Alice", Age: 20, Country: "Italy"})
+  err := db.Put("alice-id", User{Name: "Alice", Age: 20, Country: "Italy"})
   if err != nil {
     panic(err)
   }
 
   // The variable alice here will be of type User.
-  alice, err := katalis.Get("alice-id")
+  alice, err := db.Get("alice-id")
   if err != nil {
     panic(err)
   }
