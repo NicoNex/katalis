@@ -1,4 +1,4 @@
-module katalis
+module github.com/NicoNex/katalis
 
 go 1.22.3
 
