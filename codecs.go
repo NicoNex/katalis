@@ -144,11 +144,11 @@ func (ic int16Codec) Decode(b []byte) (int16, error) {
 type intCodec struct{}
 
 func (ic intCodec) Encode(i int) ([]byte, error) {
-	return UintCodec.Encode(uint(i))
+	return Int32Codec.Encode(int32(i))
 }
 
 func (ic intCodec) Decode(b []byte) (int, error) {
-	i, err := UintCodec.Decode(b)
+	i, err := Int32Codec.Decode(b)
 	return int(i), err
 }
 

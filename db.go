@@ -164,20 +164,21 @@ func (db DB[KT, VT]) Items() iter.Seq2[KT, VT] {
 	}
 }
 
-// zero returns the zero value for type T.
-func zero[T any](_ ...T) (z T) { return }
-
-// errSeq is an iterator over key-value pairs with error reporting.
-type errSeq[K, V any] func(yield func(K, V, error) bool)
+// Entry represents a key-value pair from the database. It is used by AllItems
+// to return both the key and value together with potential errors during iteration.
+type Entry[KT, VT any] struct {
+	Key   KT
+	Value VT
+}
 
 // AllItems returns an iterator over all key-value pairs in the database with
 // error reporting. Unlike Items, decode errors are yielded to the caller rather
 // than terminating iteration.
-func (db DB[KT, VT]) AllItems() errSeq[KT, VT] {
-	return func(yield func(KT, VT, error) bool) {
+func (db DB[KT, VT]) AllItems() iter.Seq2[Entry[KT, VT], error] {
+	return func(yield func(Entry[KT, VT], error) bool) {
 		iter := db.DB.Items()
 		for {
-			var key, val = zero[KT](), zero[VT]()
+			var entry Entry[KT, VT]
 
 			kb, vb, err := iter.Next()
 			if isTerminate(err) {
@@ -185,13 +186,13 @@ func (db DB[KT, VT]) AllItems() errSeq[KT, VT] {
 			}
 
 			if err == nil {
-				key, err = db.keyCodec.Decode(kb)
+				entry.Key, err = db.keyCodec.Decode(kb)
 			}
 			if err == nil {
-				val, err = db.valCodec.Decode(vb)
+				entry.Value, err = db.valCodec.Decode(vb)
 			}
 
-			if !yield(key, val, err) {
+			if !yield(entry, err) {
 				return
 			}
 		}
