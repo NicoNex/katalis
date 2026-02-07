@@ -27,40 +27,6 @@ var (
 	StringCodec = stringCodec{}
 )
 
-// codecFor returns the appropriate codec for type T. For primitive types, it
-// returns the corresponding predefined codec. For custom types, it returns a
-// GobCodec.
-func codecFor[T any]() Codec[T] {
-	switch any(zero[T]()).(type) {
-	case string:
-		return any(StringCodec).(Codec[T])
-	case []byte:
-		return any(BytesCodec).(Codec[T])
-	case uint:
-		return any(UintCodec).(Codec[T])
-	case uint16:
-		return any(Uint16Codec).(Codec[T])
-	case uint32:
-		return any(Uint32Codec).(Codec[T])
-	case uint64:
-		return any(Uint64Codec).(Codec[T])
-	case int:
-		return any(IntCodec).(Codec[T])
-	case int16:
-		return any(Int16Codec).(Codec[T])
-	case int32:
-		return any(Int32Codec).(Codec[T])
-	case int64:
-		return any(Int64Codec).(Codec[T])
-	case float32:
-		return any(Float32Codec).(Codec[T])
-	case float64:
-		return any(Float64Codec).(Codec[T])
-	default:
-		return GobCodec[T]{}
-	}
-}
-
 type uint64Codec struct{}
 
 func (uc uint64Codec) Encode(i uint64) ([]byte, error) {
