@@ -7,16 +7,18 @@ import (
 	"math"
 )
 
+// Predefined codecs for common Go types. These codecs handle encoding and
+// decoding of primitive types to/from byte slices for database storage.
 var (
 	UintCodec   = uintCodec{}
-	Uint64Codec = uint64Codec{}
-	Uint32Codec = uint32Codec{}
 	Uint16Codec = uint16Codec{}
+	Uint32Codec = uint32Codec{}
+	Uint64Codec = uint64Codec{}
 
 	IntCodec   = intCodec{}
-	Int64Codec = int64Codec{}
-	Int32Codec = int32Codec{}
 	Int16Codec = int16Codec{}
+	Int32Codec = int32Codec{}
+	Int64Codec = int64Codec{}
 
 	Float64Codec = float64Codec{}
 	Float32Codec = float32Codec{}
@@ -24,6 +26,40 @@ var (
 	BytesCodec  = bytesCodec{}
 	StringCodec = stringCodec{}
 )
+
+// codecFor returns the appropriate codec for type T. For primitive types, it
+// returns the corresponding predefined codec. For custom types, it returns a
+// GobCodec.
+func codecFor[T any]() Codec[T] {
+	switch any(zero[T]()).(type) {
+	case string:
+		return any(StringCodec).(Codec[T])
+	case []byte:
+		return any(BytesCodec).(Codec[T])
+	case uint:
+		return any(UintCodec).(Codec[T])
+	case uint16:
+		return any(Uint16Codec).(Codec[T])
+	case uint32:
+		return any(Uint32Codec).(Codec[T])
+	case uint64:
+		return any(Uint64Codec).(Codec[T])
+	case int:
+		return any(IntCodec).(Codec[T])
+	case int16:
+		return any(Int16Codec).(Codec[T])
+	case int32:
+		return any(Int32Codec).(Codec[T])
+	case int64:
+		return any(Int64Codec).(Codec[T])
+	case float32:
+		return any(Float32Codec).(Codec[T])
+	case float64:
+		return any(Float64Codec).(Codec[T])
+	default:
+		return GobCodec[T]{}
+	}
+}
 
 type uint64Codec struct{}
 
@@ -158,18 +194,23 @@ func (sc bytesCodec) Decode(b []byte) ([]byte, error) {
 	return b, nil
 }
 
+// Gob returns a GobCodec for type T. The optional variadic parameter allows
+// type inference from a value.
+func Gob[T any](_ ...T) (g GobCodec[T]) { return }
+
+// GobCodec is a generic codec that uses Go's gob encoding to serialize values.
+// It works with any type that can be encoded by the encoding/gob package.
 type GobCodec[T any] struct{}
 
+// Encode serializes the value using gob encoding.
 func (pc GobCodec[T]) Encode(a T) ([]byte, error) {
 	var buf bytes.Buffer
 
-	enc := gob.NewEncoder(&buf)
-	err := enc.Encode(a)
+	err := gob.NewEncoder(&buf).Encode(a)
 	return buf.Bytes(), err
 }
 
+// Decode deserializes the value using gob decoding.
 func (pc GobCodec[T]) Decode(b []byte) (t T, err error) {
-	dec := gob.NewDecoder(bytes.NewReader(b))
-	err = dec.Decode(&t)
-	return
+	return t, gob.NewDecoder(bytes.NewReader(b)).Decode(&t)
 }

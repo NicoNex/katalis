@@ -3,6 +3,7 @@ package katalis
 import (
 	"errors"
 	"io"
+	"iter"
 	"time"
 
 	"github.com/akrylysov/pogreb"
@@ -27,18 +28,15 @@ var ErrIterationDone = pogreb.ErrIterationDone
 // Open opens or creates a new DB. The DB must be closed after use, by calling
 // Close method.
 func Open[KT, VT any](path string, keyCodec Codec[KT], valCodec Codec[VT]) (db DB[KT, VT], err error) {
-	pg, err := pogreb.Open(path, &pogreb.Options{
-		BackgroundSyncInterval:       -1,
-		BackgroundCompactionInterval: time.Hour * 24,
-	})
-
-	db = DB[KT, VT]{
-		DB:       pg,
-		path:     path,
-		keyCodec: keyCodec,
-		valCodec: valCodec,
-	}
-	return
+	return OpenOptions(
+		path,
+		keyCodec,
+		valCodec,
+		&pogreb.Options{
+			BackgroundSyncInterval:       -1,
+			BackgroundCompactionInterval: time.Hour * 24,
+		},
+	)
 }
 
 // OpenOptions is like Open but accepts an Options struct.
@@ -89,6 +87,7 @@ func (db DB[KT, VT]) Put(key KT, val VT) error {
 	return db.DB.Put(kb, vb)
 }
 
+// Del deletes the value for the given key from the DB.
 func (db DB[KT, VT]) Del(key KT) error {
 	// Encode the key to []byte.
 	kb, err := db.keyCodec.Encode(key)
@@ -134,6 +133,69 @@ func (db DB[KT, VT]) Fold(fn func(key KT, val VT, err error) error) (err error) 
 		err = fn(key, val, err)
 	}
 	return
+}
+
+// Items returns an iterator over all key-value pairs in the database. The
+// iteration stops on first decode error or when the yield function returns false.
+func (db DB[KT, VT]) Items() iter.Seq2[KT, VT] {
+	items := db.DB.Items()
+
+	return func(yield func(KT, VT) bool) {
+		for {
+			kb, vb, err := items.Next()
+			if isTerminate(err) {
+				return
+			}
+
+			key, err := db.keyCodec.Decode(kb)
+			if err != nil {
+				return
+			}
+
+			val, err := db.valCodec.Decode(vb)
+			if err != nil {
+				return
+			}
+
+			if !yield(key, val) {
+				return
+			}
+		}
+	}
+}
+
+// zero returns the zero value for type T.
+func zero[T any](_ ...T) (z T) { return }
+
+// errSeq is an iterator over key-value pairs with error reporting.
+type errSeq[K, V any] func(yield func(K, V, error) bool)
+
+// AllItems returns an iterator over all key-value pairs in the database with
+// error reporting. Unlike Items, decode errors are yielded to the caller rather
+// than terminating iteration.
+func (db DB[KT, VT]) AllItems() errSeq[KT, VT] {
+	return func(yield func(KT, VT, error) bool) {
+		iter := db.DB.Items()
+		for {
+			var key, val = zero[KT](), zero[VT]()
+
+			kb, vb, err := iter.Next()
+			if isTerminate(err) {
+				return
+			}
+
+			if err == nil {
+				key, err = db.keyCodec.Decode(kb)
+			}
+			if err == nil {
+				val, err = db.valCodec.Decode(vb)
+			}
+
+			if !yield(key, val, err) {
+				return
+			}
+		}
+	}
 }
 
 func isTerminate(err error) bool {
