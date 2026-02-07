@@ -135,26 +135,32 @@ func (db DB[KT, VT]) Fold(fn func(key KT, val VT, err error) error) (err error) 
 	return
 }
 
-// Items returns an iterator over all key-value pairs in the database. The
-// iteration stops on first decode error or when the yield function returns false.
+// Items returns an iterator over all key-value pairs in the database. Decode
+// errors are silently skipped, allowing iteration to continue. Use AllItems if
+// you need to handle errors explicitly.
 func (db DB[KT, VT]) Items() iter.Seq2[KT, VT] {
 	items := db.DB.Items()
 
 	return func(yield func(KT, VT) bool) {
 		for {
+			var key KT
+			var val VT
+
 			kb, vb, err := items.Next()
 			if isTerminate(err) {
 				return
 			}
 
-			key, err := db.keyCodec.Decode(kb)
-			if err != nil {
-				return
+			if err == nil {
+				key, err = db.keyCodec.Decode(kb)
+			}
+			if err == nil {
+				val, err = db.valCodec.Decode(vb)
 			}
 
-			val, err := db.valCodec.Decode(vb)
+			// Skip entries with errors
 			if err != nil {
-				return
+				continue
 			}
 
 			if !yield(key, val) {
